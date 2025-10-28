@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meeting Matcher</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f7f7f9;
+      color: #222;
+    }
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+    main {
+      width: min(960px, 100%);
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 18px 40px -24px rgba(0,0,0,.3);
+      padding: clamp(16px, 3vw, 32px);
+      box-sizing: border-box;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+    }
+    p { margin-top: 0; line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: .9rem;
+    }
+    input, select, button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,.16);
+      font: inherit;
+      background: rgba(255,255,255,.8);
+      box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    button {
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary {
+      background: #2563eb;
+      border-color: #1d4ed8;
+      color: white;
+    }
+    button[disabled] {
+      cursor: progress;
+      opacity: .7;
+    }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .muted { color: #555; font-size: .9rem; }
+    #card {
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,.08);
+      padding: clamp(16px, 3vw, 32px);
+      background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(245,247,255,.92));
+    }
+    #candidate {
+      font-size: clamp(1.3rem, 3vw, 1.6rem);
+      font-weight: 600;
+      margin: 12px 0 4px;
+    }
+    #messages { min-height: 24px; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 12px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(0,0,0,.08);
+      font-variant-numeric: tabular-nums;
+    }
+    th { font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; }
+    #roomUI { display: none; }
+    #leader tbody tr:first-child {
+      background: rgba(37, 99, 235, 0.08);
+      font-weight: 600;
+    }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; padding: 2px 4px; background: rgba(15,23,42,.06); border-radius: 6px; }
+    @media (prefers-color-scheme: dark) {
+      :root { background: #0f172a; color: #e2e8f0; }
+      main { background: #111827; box-shadow: none; }
+      input, select, button { background: rgba(17,24,39,.8); color: inherit; border-color: rgba(148,163,184,.3); }
+      #card { background: linear-gradient(145deg, rgba(17,24,39,.9), rgba(30,41,59,.8)); border-color: rgba(148,163,184,.3); }
+      th, td { border-bottom-color: rgba(148,163,184,.12); }
+      #leader tbody tr:first-child { background: rgba(59,130,246,.22); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="stack">
+      <h1>Meeting Matcher</h1>
+      <p class="muted">Create an ephemeral room, invite teammates, and rapidly converge on a meeting slot. All votes are synced in real time and wiped automatically when the room expires.</p>
+    </header>
+
+    <section id="card" class="stack">
+      <div id="setup" class="stack">
+        <div class="grid">
+          <label>Window start
+            <input type="datetime-local" id="startDt" />
+          </label>
+          <label>Window end
+            <input type="datetime-local" id="endDt" />
+          </label>
+          <label>Step (minutes)
+            <input type="number" id="stepMin" value="5" min="5" step="5" />
+          </label>
+        </div>
+        <div class="row">
+          <button id="newRoom" class="primary">Create room</button>
+          <input id="joinRoomId" placeholder="Room code" />
+          <button id="joinRoom">Join room</button>
+        </div>
+        <p class="muted">Room owners pick the window and cadence for suggestions. Once generated, slots remain immutable. Shareable links appear after creation.</p>
+      </div>
+
+      <div id="roomUI" class="stack">
+        <div class="row" style="justify-content: space-between; gap: 16px;">
+          <div>Room <code id="rid"></code></div>
+          <div class="row" style="gap: 8px;">
+            <button id="copyLink">Copy share link</button>
+            <span id="expiresInfo" class="muted"></span>
+          </div>
+        </div>
+        <div class="row" style="gap: 12px;">
+          <select id="mode">
+            <option value="strict">Strict mode (only show slots with no No votes)</option>
+            <option value="score">Score mode (Yes − λ × No)</option>
+          </select>
+          <label style="width: 120px;">
+            λ
+            <input id="lambda" type="number" value="2" min="1" step="1" />
+          </label>
+        </div>
+        <div id="candidate">Waiting for slots…</div>
+        <div id="messages" class="muted"></div>
+        <div class="row">
+          <button id="noBtn">No</button>
+          <button id="yesBtn" class="primary">Yes</button>
+        </div>
+
+        <section id="leader" class="stack">
+          <h2>Live leaderboard</h2>
+          <p class="muted">Shows the top-scoring options computed from immutable votes.</p>
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Yes</th><th>No</th><th>Score</th></tr>
+            </thead>
+            <tbody id="leaderBody"></tbody>
+          </table>
+        </section>
+      </div>
+    </section>
+    <footer class="muted" style="margin-top: 18px; font-size: .8rem;">
+      <p>Configure Firestore TTL on <code>expiresAt</code> to ensure automatic cleanup. Votes are stored one-per-user-per-slot using deterministic document IDs.</p>
+    </footer>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore,
+      serverTimestamp,
+      Timestamp,
+      doc,
+      setDoc,
+      getDoc,
+      collection,
+      onSnapshot,
+      writeBatch
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // TODO: Replace with your Firebase project configuration.
+    const firebaseConfig = {
+      apiKey: "YOUR_KEY",
+      authDomain: "YOUR_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const $ = (selector) => /** @type {HTMLElement} */(document.querySelector(selector));
+    const startInput = /** @type {HTMLInputElement} */($("#startDt"));
+    const endInput = /** @type {HTMLInputElement} */($("#endDt"));
+    const stepInput = /** @type {HTMLInputElement} */($("#stepMin"));
+    const roomUI = $("#roomUI");
+    const setupUI = $("#setup");
+    const candidateEl = $("#candidate");
+    const messagesEl = $("#messages");
+    const leaderBody = $("#leaderBody");
+
+    let uid = null;
+    let roomId = null;
+    let roomRef = null;
+    /** @type {{id: string, ts: Date}[]} */
+    let slots = [];
+    /** @type {Map<string,{yes:Set<string>, no:Set<string>}>} */
+    const votesBySlot = new Map();
+    /** @type {Set<string>} */
+    let myVotedSlots = new Set();
+    let unsubscribeSlots = null;
+    let unsubscribeVotes = null;
+
+    const tzFormatter = new Intl.DateTimeFormat([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    });
+
+    function formatLocal(date) {
+      return tzFormatter.format(date);
+    }
+
+    function randomId(length = 6) {
+      const alphabet = "abcdefghijkmnopqrstuvwxyz0123456789";
+      let out = "";
+      for (let i = 0; i < length; i++) {
+        out += alphabet[Math.floor(Math.random() * alphabet.length)];
+      }
+      return out;
+    }
+
+    async function ensureSignedIn() {
+      if (uid) return uid;
+      await signInAnonymously(auth);
+      return new Promise(resolve => {
+        const unsub = onAuthStateChanged(auth, (user) => {
+          if (user) {
+            uid = user.uid;
+            unsub();
+            resolve(uid);
+          }
+        });
+      });
+    }
+
+    function setLoading(button, loading) {
+      button.disabled = loading;
+      if (loading) {
+        button.dataset.prevText = button.textContent || "";
+        button.textContent = "Working…";
+      } else if (button.dataset.prevText) {
+        button.textContent = button.dataset.prevText;
+        delete button.dataset.prevText;
+      }
+    }
+
+    async function createRoom() {
+      const createBtn = /** @type {HTMLButtonElement} */($("#newRoom"));
+      try {
+        setLoading(createBtn, true);
+        await ensureSignedIn();
+        const rid = randomId();
+        const now = Date.now();
+        const expiresAt = Timestamp.fromDate(new Date(now + 2 * 60 * 60 * 1000));
+
+        const stepMinutes = Math.max(5, parseInt(stepInput.value || "5", 10));
+        const windowStart = startInput.value ? new Date(startInput.value) : new Date(now);
+        const windowEnd = endInput.value ? new Date(endInput.value) : new Date(now + 7 * 24 * 60 * 60 * 1000);
+        if (windowEnd <= windowStart) throw new Error("End must be after start.");
+
+        roomId = rid;
+        roomRef = doc(db, "rooms", roomId);
+        await setDoc(roomRef, {
+          ownerUid: uid,
+          createdAt: serverTimestamp(),
+          expiresAt,
+          seed: Math.floor(Math.random() * 2 ** 31),
+          windowStart: Timestamp.fromDate(windowStart),
+          windowEnd: Timestamp.fromDate(windowEnd),
+          stepMinutes
+        });
+
+        await seedSlots(windowStart, windowEnd, stepMinutes);
+        onRoomReady();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(createBtn, false);
+      }
+    }
+
+    async function seedSlots(windowStart, windowEnd, stepMinutes) {
+      if (!roomRef) throw new Error("Room reference missing.");
+      const slotCol = collection(roomRef, "slots");
+      const stepMs = stepMinutes * 60 * 1000;
+      const first = Math.ceil(windowStart.getTime() / stepMs) * stepMs;
+      const last = Math.floor(windowEnd.getTime() / stepMs) * stepMs;
+      const cap = 300;
+      /** @type {number[]} */
+      const times = [];
+      for (let t = first; t <= last; t += stepMs) times.push(t);
+      if (!times.length) throw new Error("No slots fall inside the given window.");
+      if (times.length > cap) {
+        const ratio = cap / times.length;
+        const trimmed = [];
+        for (const t of times) {
+          if (Math.random() < ratio) trimmed.push(t);
+          if (trimmed.length === cap) break;
+        }
+        times.splice(0, times.length, ...trimmed);
+      }
+      for (let i = times.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [times[i], times[j]] = [times[j], times[i]];
+      }
+      let batch = writeBatch(db);
+      let ops = 0;
+      const commit = async () => {
+        if (ops === 0) return;
+        await batch.commit();
+        batch = writeBatch(db);
+        ops = 0;
+      };
+      for (const t of times) {
+        const slotId = String(t);
+        batch.set(doc(slotCol, slotId), {
+          ts: Timestamp.fromMillis(t)
+        });
+        ops++;
+        if (ops === 490) await commit();
+      }
+      await commit();
+    }
+
+    async function joinRoom() {
+      await ensureSignedIn();
+      const joinBtn = /** @type {HTMLButtonElement} */($("#joinRoom"));
+      const input = /** @type {HTMLInputElement} */($("#joinRoomId"));
+      const rid = input.value.trim();
+      if (!rid) return alert("Enter a room code.");
+      try {
+        setLoading(joinBtn, true);
+        roomId = rid;
+        roomRef = doc(db, "rooms", roomId);
+        const snap = await getDoc(roomRef);
+        if (!snap.exists()) throw new Error("Room not found or expired.");
+        onRoomReady(snap.data());
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(joinBtn, false);
+      }
+    }
+
+    function onRoomReady(roomData) {
+      setupUI.style.display = "none";
+      roomUI.style.display = "flex";
+      roomUI.style.flexDirection = "column";
+      $("#rid").textContent = roomId;
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", roomId);
+      history.replaceState(null, "Meeting Matcher", url.toString());
+      $("#copyLink").onclick = () => {
+        navigator.clipboard.writeText(url.toString()).then(() => {
+          alert("Link copied to clipboard.");
+        }).catch(() => alert("Unable to copy link automatically."));
+      };
+      if (roomData?.expiresAt) {
+        const expDate = roomData.expiresAt.toDate ? roomData.expiresAt.toDate() : new Date(roomData.expiresAt);
+        $("#expiresInfo").textContent = `Expires around ${expDate.toLocaleString()}`;
+      } else {
+        $("#expiresInfo").textContent = "Expires in about 2 hours.";
+      }
+      subscribeToRoom();
+    }
+
+    function subscribeToRoom() {
+      if (!roomRef) return;
+      unsubscribeSlots?.();
+      unsubscribeVotes?.();
+      slots = [];
+      votesBySlot.clear();
+      myVotedSlots = new Set();
+
+      unsubscribeSlots = onSnapshot(collection(roomRef, "slots"), (qs) => {
+        slots = qs.docs
+          .map(docSnap => {
+            const data = docSnap.data();
+            const raw = data.ts;
+            const ts = raw?.toDate ? raw.toDate() : new Date(raw);
+            return { id: docSnap.id, ts };
+          })
+          .sort((a, b) => a.ts - b.ts);
+        pickAndRenderNext();
+      });
+
+      unsubscribeVotes = onSnapshot(collection(roomRef, "votes"), (qs) => {
+        votesBySlot.clear();
+        const mine = new Set();
+        qs.forEach(docSnap => {
+          const vote = docSnap.data();
+          const slotId = vote.slotId;
+          if (!votesBySlot.has(slotId)) {
+            votesBySlot.set(slotId, { yes: new Set(), no: new Set() });
+          }
+          votesBySlot.get(slotId)[vote.value].add(vote.uid);
+          if (vote.uid === uid) mine.add(slotId);
+        });
+        myVotedSlots = mine;
+        renderLeaderboard();
+        pickAndRenderNext();
+      });
+    }
+
+    async function castVote(slotId, value) {
+      if (!roomRef) return;
+      const voteRef = doc(collection(roomRef, "votes"), `${uid}__${slotId}`);
+      try {
+        await setDoc(voteRef, {
+          slotId,
+          uid,
+          value,
+          at: serverTimestamp()
+        });
+        myVotedSlots.add(slotId);
+        pickAndRenderNext();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    function renderLeaderboard() {
+      const lambdaInput = /** @type {HTMLInputElement} */($("#lambda"));
+      const lambda = Math.max(1, parseInt(lambdaInput.value || "2", 10));
+      const rows = slots.map(slot => {
+        const votes = votesBySlot.get(slot.id) || { yes: new Set(), no: new Set() };
+        const yes = votes.yes.size;
+        const no = votes.no.size;
+        const score = yes - lambda * no;
+        return { slot, yes, no, score };
+      }).sort((a, b) => b.score - a.score || a.slot.ts - b.slot.ts);
+
+      leaderBody.innerHTML = "";
+      rows.slice(0, 12).forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${formatLocal(row.slot.ts)}</td><td>${row.yes}</td><td>${row.no}</td><td>${row.score}</td>`;
+        leaderBody.appendChild(tr);
+      });
+    }
+
+    function pickNextStrict() {
+      for (const slot of slots) {
+        if (myVotedSlots.has(slot.id)) continue;
+        const votes = votesBySlot.get(slot.id);
+        if (!votes || votes.no.size === 0) return slot;
+      }
+      return null;
+    }
+
+    function pickNextScore() {
+      const lambda = Math.max(1, parseInt((/** @type {HTMLInputElement} */($("#lambda"))).value || "2", 10));
+      let best = null;
+      let bestScore = -Infinity;
+      for (const slot of slots) {
+        if (myVotedSlots.has(slot.id)) continue;
+        const votes = votesBySlot.get(slot.id) || { yes: new Set(), no: new Set() };
+        const score = votes.yes.size - lambda * votes.no.size;
+        if (score > bestScore || (score === bestScore && slot.ts < (best?.ts ?? Infinity))) {
+          best = slot;
+          bestScore = score;
+        }
+      }
+      return best;
+    }
+
+    function pickAndRenderNext() {
+      if (!slots.length) {
+        candidateEl.textContent = "Waiting for the room owner to generate slots…";
+        messagesEl.textContent = "";
+        return;
+      }
+      const mode = (/** @type {HTMLSelectElement} */($("#mode"))).value;
+      const next = mode === "strict" ? pickNextStrict() : pickNextScore();
+      if (!next) {
+        candidateEl.textContent = "You're all caught up!";
+        messagesEl.textContent = "You can keep an eye on the leaderboard as teammates vote.";
+        return;
+      }
+      candidateEl.textContent = `Candidate: ${formatLocal(next.ts)}`;
+      messagesEl.textContent = "Swipe left/right in spirit or click below to lock in your vote.";
+      $("#yesBtn").onclick = () => castVote(next.id, "yes");
+      $("#noBtn").onclick = () => castVote(next.id, "no");
+    }
+
+    $("#mode").addEventListener("change", () => {
+      pickAndRenderNext();
+    });
+    $("#lambda").addEventListener("change", () => {
+      renderLeaderboard();
+      pickAndRenderNext();
+    });
+    $("#newRoom").addEventListener("click", createRoom);
+    $("#joinRoom").addEventListener("click", joinRoom);
+
+    (async function initFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const urlRoom = params.get("room");
+      if (!urlRoom) return;
+      ensureSignedIn().then(async () => {
+        roomId = urlRoom;
+        roomRef = doc(db, "rooms", roomId);
+        const snap = await getDoc(roomRef);
+        if (!snap.exists()) {
+          alert("Room not found or expired.");
+          return;
+        }
+        onRoomReady(snap.data());
+      });
+    })();
+  </script>
+</body>
+</html>
