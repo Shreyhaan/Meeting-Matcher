@@ -18,6 +18,8 @@ Meeting Matcher is a lightweight, single-page web application that helps small g
 4. Copy the entire `const firebaseConfig = { … }` object from the Firebase console's CDN snippet and paste it over the placeholder in [`index.html`](./index.html). Bring every key Firebase includes (for example `storageBucket`, `appId`, `measurementId`) and keep the existing `<script type="module">` imports—skip the extra analytics helper function that snippet shows by default.
 5. Deploy the file to any static host (GitHub Pages, Firebase Hosting, Netlify, etc.).
 
+If you see `Firebase: Error (auth/api-key-not-valid...)` after clicking **Create room**, double-check that the `firebaseConfig` block no longer contains placeholder values. Re-copy the snippet from **Project settings → General → Your apps → Web** and ensure `apiKey`, `authDomain`, `projectId`, and `appId` match your Firebase project.
+
 When you visit the deployed page:
 
 1. Click **Create room** and provide optional start/end boundaries and a step size.
