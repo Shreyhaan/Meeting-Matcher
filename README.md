@@ -20,6 +20,18 @@ Meeting Matcher is a lightweight, single-page web application that helps small g
 
 If you see `Firebase: Error (auth/api-key-not-valid...)` after clicking **Create room**, double-check that the `firebaseConfig` block no longer contains placeholder values. Re-copy the snippet from **Project settings → General → Your apps → Web** and ensure `apiKey`, `authDomain`, `projectId`, and `appId` match your Firebase project.
 
+### Copying your `firebaseConfig`
+
+Follow these exact steps to grab the correct credentials:
+
+1. In the Firebase console, open **Project settings → General**.
+2. Scroll to **Your apps**. If you have not registered a web app yet, click the `</>` icon to add one (you can skip hosting and analytics during this wizard).
+3. In the Web app card, click **Config**. Firebase will display a snippet that includes `const firebaseConfig = { … }`.
+4. Copy the entire object—every property between the braces—and paste it into [`index.html`](./index.html), replacing the placeholder values.
+5. If your snippet does **not** include `measurementId`, delete that line from the placeholder block so no `YOUR_MEASUREMENT_ID` text remains.
+
+The app checks for any leftover `YOUR_…` placeholders and shows a detailed alert before Firebase initializes. If you still see `auth/api-key-not-valid`, repeat the steps above to ensure no key was truncated or mis-typed.
+
 When you visit the deployed page:
 
 1. Click **Create room** and provide optional start/end boundaries and a step size.
