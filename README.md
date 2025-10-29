@@ -13,9 +13,9 @@ Meeting Matcher is a lightweight, single-page web application that helps small g
 ## Getting started
 
 1. Create a Firebase project with Firestore and Anonymous Auth enabled.
-2. Enable [Firestore TTL](https://firebase.google.com/docs/firestore/ttl) on the `rooms` collection for the `expiresAt` field.
+2. Enable [Firestore TTL](https://firebase.google.com/docs/firestore/ttl) on the `rooms` collection for the `expiresAt` field (see the detailed steps below).
 3. Download the repository and open [`index.html`](./index.html) in your editor.
-4. Replace the `firebaseConfig` placeholder with your Firebase project's configuration snippet.
+4. Copy the entire `const firebaseConfig = { … }` object from the Firebase console's CDN snippet and paste it over the placeholder in [`index.html`](./index.html). Bring every key Firebase includes (for example `storageBucket`, `appId`, `measurementId`) and keep the existing `<script type="module">` imports—skip the extra analytics helper function that snippet shows by default.
 5. Deploy the file to any static host (GitHub Pages, Firebase Hosting, Netlify, etc.).
 
 When you visit the deployed page:
@@ -68,6 +68,19 @@ service cloud.firestore {
 ```
 
 These rules align with the application logic: slot creation is restricted to the room owner, and each participant can only vote once per slot.
+
+## Enabling Firestore TTL step by step
+
+If the TTL screen is not obvious in the console, follow these exact steps:
+
+1. In the Firebase console, open **Build → Firestore Database**.
+2. At the top of the Firestore view, click the **Data** tab (this is the default tab where you browse collections).
+3. In the left sidebar, select the collection you want to manage—choose `rooms`.
+4. With the collection selected, click **Add TTL policy** in the right-side panel (or from the overflow menu) to start the policy wizard.
+5. For **Field name**, enter `expiresAt`. The field must use the *Date and time* type.
+6. Leave the default condition (“Delete document when TTL field time has passed”) enabled and save the policy.
+
+Firestore will now automatically delete each room document (and its subcollections) once the `expiresAt` timestamp is in the past. If the **Add TTL policy** action is unavailable, make sure your project is on the Blaze plan (TTL is not offered on the Spark plan) and that you have already created at least one document in the `rooms` collection so the field can be detected.
 
 ## License
 
