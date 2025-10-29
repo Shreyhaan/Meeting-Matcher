@@ -191,11 +191,17 @@
       writeBatch
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // TODO: Replace with your Firebase project configuration.
+    // TODO: Replace this entire object with the `firebaseConfig` snippet from the Firebase console.
+    // Copy every key Firebase gives you (apiKey, authDomain, projectId, storageBucket, appId, etc.).
+    // If your snippet includes measurementId, keep it; otherwise you can delete that line.
     const firebaseConfig = {
-      apiKey: "YOUR_KEY",
-      authDomain: "YOUR_DOMAIN",
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
       projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID",
+      measurementId: "YOUR_MEASUREMENT_ID", // optional
     };
 
     const app = initializeApp(firebaseConfig);
