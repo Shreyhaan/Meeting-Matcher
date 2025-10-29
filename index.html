@@ -195,13 +195,13 @@
     // Copy every key Firebase gives you (apiKey, authDomain, projectId, storageBucket, appId, etc.).
     // If your snippet includes measurementId, keep it; otherwise you can delete that line.
     const firebaseConfig = {
-      apiKey: "AIzaSyDDkzwNX95KPFRC-9ZB_OEDwctQCTgXsm8",
-      authDomain: "meeting-matcher.firebaseapp.com",
-      projectId: "meeting-matcher",
-      storageBucket: "meeting-matcher.firebasestorage.app",
-      messagingSenderId: "615524108383",
-      appId: "1:615524108383:web:8ec14c72f130b47e53b3ea",
-      measurementId: "G-GWSTM3R5G2"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID",
+      measurementId: "YOUR_MEASUREMENT_ID", // optional – delete this line if your snippet omits it
     };
 
     /**
@@ -212,6 +212,8 @@
      */
     function assertValidFirebaseConfig(config) {
       const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
+      const optionalKeys = ["storageBucket", "messagingSenderId", "measurementId"];
+      const placeholderPattern = /YOUR_[A-Z_]+/;
       const missing = [];
       const placeholders = [];
 
@@ -219,17 +221,25 @@
         const value = config[key];
         if (!value) {
           missing.push(key);
-        } else if (typeof value === "string" && value.includes("YOUR_")) {
+        } else if (typeof value === "string" && placeholderPattern.test(value)) {
           placeholders.push(key);
+        }
+      }
+
+      for (const key of optionalKeys) {
+        const value = config[key];
+        if (typeof value === "string" && placeholderPattern.test(value)) {
+          placeholders.push(`${key} (remove or replace)`);
         }
       }
 
       if (missing.length || placeholders.length) {
         const problems = [];
-        if (missing.length) problems.push(`missing: ${missing.join(", ")}`);
-        if (placeholders.length) problems.push(`placeholders detected: ${placeholders.join(", ")}`);
-        const message = `Update firebaseConfig with your project credentials (${problems.join("; ")}).`;
+        if (missing.length) problems.push(`missing keys: ${missing.join(", ")}`);
+        if (placeholders.length) problems.push(`placeholder text still present for ${placeholders.join(", ")}`);
+        const message = `Firebase is not configured. Copy the entire firebaseConfig object from the Firebase console and replace every value. See README → "Copying your firebaseConfig".\n\nDetails: ${problems.join("; ")}`;
         alert(message);
+        console.error(message);
         throw new Error(message);
       }
     }
@@ -491,11 +501,20 @@
         const yes = votes.yes.size;
         const no = votes.no.size;
         const score = yes - lambda * no;
-        return { slot, yes, no, score };
-      }).sort((a, b) => b.score - a.score || a.slot.ts - b.slot.ts);
+        const hasVotes = yes + no > 0;
+        return { slot, yes, no, score, hasVotes };
+      }).sort((a, b) => {
+        if (a.hasVotes !== b.hasVotes) return b.hasVotes - a.hasVotes;
+        return b.score - a.score || a.slot.ts - b.slot.ts;
+      });
+
+      const votedRows = rows.filter(row => row.hasVotes);
+      const unvotedRows = rows.filter(row => !row.hasVotes);
+      const limit = Math.max(12, votedRows.length);
+      const displayRows = votedRows.concat(unvotedRows).slice(0, limit);
 
       leaderBody.innerHTML = "";
-      rows.slice(0, 12).forEach(row => {
+      displayRows.forEach(row => {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td>${formatLocal(row.slot.ts)}</td><td>${row.yes}</td><td>${row.no}</td><td>${row.score}</td>`;
         leaderBody.appendChild(tr);
