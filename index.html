@@ -204,6 +204,38 @@
       measurementId: "YOUR_MEASUREMENT_ID", // optional
     };
 
+    /**
+     * Validate that the Firebase configuration was replaced with real values
+     * copied from the Firebase console. Attempting to initialize Firebase with
+     * placeholder keys results in the opaque
+     * `auth/api-key-not-valid` error, so we fail fast with a clearer message.
+     */
+    function assertValidFirebaseConfig(config) {
+      const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
+      const missing = [];
+      const placeholders = [];
+
+      for (const key of requiredKeys) {
+        const value = config[key];
+        if (!value) {
+          missing.push(key);
+        } else if (typeof value === "string" && value.includes("YOUR_")) {
+          placeholders.push(key);
+        }
+      }
+
+      if (missing.length || placeholders.length) {
+        const problems = [];
+        if (missing.length) problems.push(`missing: ${missing.join(", ")}`);
+        if (placeholders.length) problems.push(`placeholders detected: ${placeholders.join(", ")}`);
+        const message = `Update firebaseConfig with your project credentials (${problems.join("; ")}).`;
+        alert(message);
+        throw new Error(message);
+      }
+    }
+
+    assertValidFirebaseConfig(firebaseConfig);
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
