@@ -15,7 +15,7 @@ Meeting Matcher is a lightweight, single-page web application that helps small g
 1. Create a Firebase project with Firestore and Anonymous Auth enabled.
 2. Enable [Firestore TTL](https://firebase.google.com/docs/firestore/ttl) on the `rooms` collection for the `expiresAt` field (see the detailed steps below).
 3. Download the repository and open [`index.html`](./index.html) in your editor.
-4. Replace the `firebaseConfig` placeholder with your Firebase project's configuration snippet.
+4. Copy the `const firebaseConfig = { … }` block from the Firebase console's CDN snippet and paste it over the placeholder in [`index.html`](./index.html). You only need the object—keep the existing `<script type="module">` imports and skip the analytics helper that Firebase includes by default.
 5. Deploy the file to any static host (GitHub Pages, Firebase Hosting, Netlify, etc.).
 
 When you visit the deployed page:
