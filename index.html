@@ -212,8 +212,6 @@
      */
     function assertValidFirebaseConfig(config) {
       const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
-      const optionalKeys = ["storageBucket", "messagingSenderId", "measurementId"];
-      const placeholderPattern = /YOUR_[A-Z_]+/;
       const missing = [];
       const placeholders = [];
 
@@ -221,25 +219,17 @@
         const value = config[key];
         if (!value) {
           missing.push(key);
-        } else if (typeof value === "string" && placeholderPattern.test(value)) {
+        } else if (typeof value === "string" && value.includes("YOUR_")) {
           placeholders.push(key);
-        }
-      }
-
-      for (const key of optionalKeys) {
-        const value = config[key];
-        if (typeof value === "string" && placeholderPattern.test(value)) {
-          placeholders.push(`${key} (remove or replace)`);
         }
       }
 
       if (missing.length || placeholders.length) {
         const problems = [];
-        if (missing.length) problems.push(`missing keys: ${missing.join(", ")}`);
-        if (placeholders.length) problems.push(`placeholder text still present for ${placeholders.join(", ")}`);
-        const message = `Firebase is not configured. Copy the entire firebaseConfig object from the Firebase console and replace every value. See README → "Copying your firebaseConfig".\n\nDetails: ${problems.join("; ")}`;
+        if (missing.length) problems.push(`missing: ${missing.join(", ")}`);
+        if (placeholders.length) problems.push(`placeholders detected: ${placeholders.join(", ")}`);
+        const message = `Update firebaseConfig with your project credentials (${problems.join("; ")}).`;
         alert(message);
-        console.error(message);
         throw new Error(message);
       }
     }
@@ -501,20 +491,11 @@
         const yes = votes.yes.size;
         const no = votes.no.size;
         const score = yes - lambda * no;
-        const hasVotes = yes + no > 0;
-        return { slot, yes, no, score, hasVotes };
-      }).sort((a, b) => {
-        if (a.hasVotes !== b.hasVotes) return b.hasVotes - a.hasVotes;
-        return b.score - a.score || a.slot.ts - b.slot.ts;
-      });
-
-      const votedRows = rows.filter(row => row.hasVotes);
-      const unvotedRows = rows.filter(row => !row.hasVotes);
-      const limit = Math.max(12, votedRows.length);
-      const displayRows = votedRows.concat(unvotedRows).slice(0, limit);
+        return { slot, yes, no, score };
+      }).sort((a, b) => b.score - a.score || a.slot.ts - b.slot.ts);
 
       leaderBody.innerHTML = "";
-      displayRows.forEach(row => {
+      rows.slice(0, 12).forEach(row => {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td>${formatLocal(row.slot.ts)}</td><td>${row.yes}</td><td>${row.no}</td><td>${row.score}</td>`;
         leaderBody.appendChild(tr);
