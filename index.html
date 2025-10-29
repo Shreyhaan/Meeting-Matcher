@@ -317,7 +317,8 @@
         const now = Date.now();
         const expiresAt = Timestamp.fromDate(new Date(now + 2 * 60 * 60 * 1000));
 
-        const stepMinutes = Math.max(5, parseInt(stepInput.value || "5", 10));
+        const raw = Number(stepInput.value);
+        const stepMinutes = Number.isFinite(raw) && raw > 0 ? raw : 5;
         const windowStart = startInput.value ? new Date(startInput.value) : new Date(now);
         const windowEnd = endInput.value ? new Date(endInput.value) : new Date(now + 7 * 24 * 60 * 60 * 1000);
         if (windowEnd <= windowStart) throw new Error("End must be after start.");
@@ -346,45 +347,40 @@
     async function seedSlots(windowStart, windowEnd, stepMinutes) {
       if (!roomRef) throw new Error("Room reference missing.");
       const slotCol = collection(roomRef, "slots");
-      const stepMs = stepMinutes * 60 * 1000;
-      const first = Math.ceil(windowStart.getTime() / stepMs) * stepMs;
-      const last = Math.floor(windowEnd.getTime() / stepMs) * stepMs;
-      const cap = 300;
-      /** @type {number[]} */
+
+      const stepMs = Math.round(stepMinutes * 60 * 1000);
+
+      const first = windowStart.getTime();
+      const last  = windowEnd.getTime();
+
+      if (stepMs <= 0) throw new Error("Step must be > 0.");
+
       const times = [];
       for (let t = first; t <= last; t += stepMs) times.push(t);
       if (!times.length) throw new Error("No slots fall inside the given window.");
-      if (times.length > cap) {
-        const ratio = cap / times.length;
-        const trimmed = [];
-        for (const t of times) {
-          if (Math.random() < ratio) trimmed.push(t);
-          if (trimmed.length === cap) break;
-        }
-        times.splice(0, times.length, ...trimmed);
-      }
-      for (let i = times.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [times[i], times[j]] = [times[j], times[i]];
-      }
+
+  // Optional safety cap to avoid massive writes; deterministic (no randomness)
+      const cap = 300;
+      if (times.length > cap) times.length = cap;
+
+  // Write in batches (kept as-is)
       let batch = writeBatch(db);
       let ops = 0;
       const commit = async () => {
-        if (ops === 0) return;
-        await batch.commit();
-        batch = writeBatch(db);
-        ops = 0;
-      };
+          if (ops === 0) return;
+          await batch.commit();
+          batch = writeBatch(db);
+          ops = 0;
+       };
+
       for (const t of times) {
         const slotId = String(t);
-        batch.set(doc(slotCol, slotId), {
-          ts: Timestamp.fromMillis(t)
-        });
+        batch.set(doc(slotCol, slotId), { ts: Timestamp.fromMillis(t) });
         ops++;
         if (ops === 490) await commit();
       }
-      await commit();
-    }
+  await commit();
+}
 
     async function joinRoom() {
       await ensureSignedIn();
