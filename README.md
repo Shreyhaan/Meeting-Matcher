@@ -1,10 +1,10 @@
 # Meeting Matcher
 
-Meeting Matcher is a lightweight, single-page web application that helps small groups rapidly converge on a mutually agreeable meeting time. The interface lets each participant swipe or tap through proposed 5-minute slots, voting "Yes" or "No" while the leaderboard updates in real time. All state lives in Firebase Firestore and rooms are automatically deleted when they expire.
+Meeting Matcher is a lightweight, single-page web application that helps small groups rapidly converge on a mutually agreeable meeting time. The interface lets each participant tap through proposed 5-minute slots, voting "Yes" or "No" while the leaderboard updates in real time. All state lives in Firebase Firestore and rooms are automatically deleted when they expire.
 
 ## Features
 
-- **Ephemeral rooms** – owners create a room with a shareable link, which disappears automatically after the configured TTL.
+- **Auto-deleting rooms** – owners create a room with a shareable link, which disappears automatically after the configured TTL in order to save space.
 - **Five-minute slots** – generate a randomized list of candidate times inside a custom availability window.
 - **Anonymous, real-time collaboration** – anonymous Firebase Auth plus Firestore listeners keep everyone in sync.
 - **Immutable, auditable votes** – every vote is stored once per user per slot; the client aggregates tallies on the fly.
@@ -20,7 +20,7 @@ Meeting Matcher is a lightweight, single-page web application that helps small g
 
 If you see `Firebase: Error (auth/api-key-not-valid...)` after clicking **Create room**, double-check that the `firebaseConfig` block no longer contains placeholder values. Re-copy the snippet from **Project settings → General → Your apps → Web** and ensure `apiKey`, `authDomain`, `projectId`, and `appId` match your Firebase project.
 
-### Copying your `firebaseConfig`
+### Copying the `firebaseConfig`
 
 Follow these exact steps to grab the correct credentials:
 
@@ -80,8 +80,6 @@ service cloud.firestore {
   }
 }
 ```
-
-These rules align with the application logic: slot creation is restricted to the room owner, and each participant can only vote once per slot.
 
 ## Enabling Firestore TTL step by step
 
